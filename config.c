@@ -1,11 +1,12 @@
 #include "config.h"
 
 const pin_setting_t pin_configuration[] = {
-	{ RPI_V2_GPIO_P1_07, XK_Left, XK_Right },
-	{ RPI_V2_GPIO_P1_11, XK_Up,  0 }
-
-
-
+							//PIN	Command Short	Command Long
+	{ RPI_V2_GPIO_P1_07, XK_minus, 0 },		//04	Vol -		-
+        { RPI_V2_GPIO_P1_11, XK_plus, 0 },		//17	Vol +		-
+        { RPI_V2_GPIO_P1_12, XK_Return, 0 },		//18	Enter (Go)	-
+        { RPI_V2_GPIO_P1_24, XK_z, XK_Z },		//08
+        { RPI_V2_GPIO_P1_22, XK_b, XK_B }
 
 };
 

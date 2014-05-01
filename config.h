@@ -18,6 +18,18 @@
 
 
 
+
+
+
+#define ROTARY_ENC_PIN_A    RPI_V2_GPIO_P1_16
+#define ROTARY_ENC_PIN_B    RPI_V2_GPIO_P1_18
+
+#define ROTARY_ENC_KEYCODE_LEFT XK_Up
+#define ROTARY_ENC_KEYCODE_RIGHT XK_Down
+
+
+
+
 //----------------structures --------------------------
 #include <stdbool.h>
 #include <stdint.h>
