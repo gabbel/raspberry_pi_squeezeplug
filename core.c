@@ -2,17 +2,24 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <signal.h>
+#include <unistd.h>
+
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
 #include <bcm2835.h>
+#include <sys/time.h>
+
 
 #include "config.h"
 
 extern pin_setting_t pin_configuration[];
 extern uint8_t number_of_pins;
 extern bool pin_state []; //array to store last state of pin
+extern uint16_t pin_pressed_time[];
+
+
 
 //x11 varibales
 Display*  display; //the one and only display to use
@@ -28,6 +35,8 @@ Used Resources:
  http://www.doctort.org/adam/nerd-notes/x11-fake-keypress-event.html
 */
 
+void do_poll();
+
 
 
 //handler for sigterm event
@@ -35,6 +44,12 @@ void sigterm_handler(int signum) {
 	terminate = true;
 }
 
+
+//timer interrupt
+void sigtimer_handler(int signum) {
+	do_poll();
+	signal(SIGALRM, sigtimer_handler);
+}
 
 //Setups the chip, configures the pins  and returns true on sucess
 bool setup() {
@@ -56,7 +71,7 @@ bool setup() {
 
 
 	// Obtain the X11 display.
-   	display = XOpenDisplay(":1"); //pass NULL without "" to read from environment variable DISPLAY
+   	display = XOpenDisplay(":0"); //pass NULL without "" to read from environment variable DISPLAY
    	if(display == NULL) {
 		fprintf(stderr,"Failed open display\n");
       		return false;
@@ -66,6 +81,15 @@ bool setup() {
 
 	//register sigterm handler
 	signal(SIGINT, sigterm_handler);
+	signal(SIGALRM, sigtimer_handler);
+	
+	struct itimerval timer;
+	timer.it_value.tv_sec = 0 ;
+   	timer.it_value.tv_usec = TIMER_INTERVAL;
+   	timer.it_interval.tv_sec = 0;
+   	timer.it_interval.tv_usec = TIMER_INTERVAL;
+	setitimer ( ITIMER_REAL, &timer, NULL ) ;
+
 	return true;
 }
 
@@ -83,20 +107,31 @@ void do_poll() {
 		bool current_state = (bcm2835_gpio_lev(pin_setting.pin)==HIGH);
 		bool old_state = pin_state[i];
 	
-		if(current_state != old_state) { //edge dectected
-    			if(current_state) {
-				#ifdef DEBUG
-					printf("Pin Released: %u\n",pin_setting.pin);
-			 	#endif
-				send_event(pin_setting.keycode,false);
-			} else {
-			 	send_event(pin_setting.keycode,true);
-				#ifdef DEBUG
-					printf("Pin Pressed: %u\nSending Keycode: %u\n",pin_setting.pin, pin_setting.keycode);
-				#endif
+
+		if(!current_state) { //button is LOW
+			if(pin_pressed_time[i] == LONG_PRESS_CYCLES && pin_setting.keycode_long!=0 ) {
+				printf("send long press down\n");
+				send_event(pin_setting.keycode_long,true);
 			}
+
+			pin_pressed_time[i]++;
 		}
 
+		if(current_state != old_state && current_state) { //if butten released = positive edge detected
+			if(pin_pressed_time[i] > LONG_PRESS_CYCLES) {
+				if(pin_setting.keycode_long!=0) {
+					printf("send long press up\n");
+					send_event(pin_setting.keycode_long,false);
+				}
+			} else {
+				printf("send short press down\n");
+				send_event(pin_setting.keycode_short,true);
+				printf("send short press up\n");
+				send_event(pin_setting.keycode_short,false);
+			}
+			pin_pressed_time[i] = 0;
+		} 		
+		
 		pin_state[i] = current_state;		
 	}
 }
@@ -111,8 +146,9 @@ int main() {
 	fprintf(stdout,"Setup ok\n");
 
 	while(!terminate) {
-		do_poll();
-		bcm2835_delay(WAIT_CYCLE); // sleep for WAIT_CYCLE miliseconds
+	/*	do_poll();
+		bcm2835_delay(WAIT_CYCLE); // sleep for WAIT_CYCLE miliseconds*/
+		sleep(1); //wait for one second
 	}
 	
 	bcm2835_close();
