@@ -69,7 +69,7 @@ const pin_setting_t pin_configuration[] = {
                                                                                                                                 //20    Pin #20 = Ground
         { RPI_V2_GPIO_P1_21, XK_p, XK_P },                                                      //21    Play
         { RPI_V2_GPIO_P1_22, XK_b, XK_B },                                                      //22    Skip Track (Forward)                    Fwd (hold)
-        { RPI_V2_GPIO_P1_23, XK_Left, XK_h },                                           //23    Back                                                    Home
+        { RPI_V2_GPIO_P1_23, XK_Escape, XK_h },                                           //23    Back                                                    Home
         { RPI_V2_GPIO_P1_24, XK_z, XK_Z },                                                      //24    Skip Track (Back)                               Rew (hold)
                                                                                                                                 //25    Pin #25 = Ground
         { RPI_V2_GPIO_P1_26, XK_bracketleft, XK_bracketright }          //26    Now Playing                                             Show Playlist
