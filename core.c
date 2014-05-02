@@ -3,14 +3,13 @@
 #include <stdint.h>
 #include <signal.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
 #include <bcm2835.h>
-#include <sys/time.h>
-
 
 #include "config.h"
 
@@ -18,10 +17,28 @@
 //x11 varibales
 Display*  display; //the one and only display to use
 
+
+//Pin variables 
+const uint8_t number_of_pins = NUM_PINS; //number of configured pins
+bool pin_state[NUM_PINS]; //storage to save last state of pin
+uint16_t pin_pressed_time [NUM_PINS];  //storage to save the number cycles the pin was presse
+
+//Timing variables
+uint16_t key_read_time =0;
+uint16_t enc_read_time =0;
+uint16_t enc_send_time =0;
+
+
 //Other variables
 volatile bool terminate = false; //abort condition
 volatile int8_t enc_delta;          // -128 ... 127
 static int8_t enc_last;
+
+
+//Encoder variables
+const int8_t table[16]  = {0,0,-1,0,0,0,0,1,1,0,0,0,0,-1,0,0}; //half resolution table - better accuracy   
+//const int8_t table[16] = {0,1,-1,0,-1,0,0,1,1,0,0,-1,0,-1,1,0}; //full resolution table
+
 
 
 /*
@@ -32,20 +49,11 @@ Used Resources:
  http://www.doctort.org/adam/nerd-notes/x11-fake-keypress-event.html
 */
 
-void do_poll();
-
 
 
 //handler for sigterm event
 void sigterm_handler(int signum) {
 	terminate = true;
-}
-
-
-//timer interrupt
-void sigtimer_handler(int signum) {
-	do_poll();
-	signal(SIGALRM, sigtimer_handler);
 }
 
 //Setups the chip, configures the pins  and returns true on sucess
@@ -83,7 +91,7 @@ bool setup() {
 
 
 	// Obtain the X11 display.
-   	display = XOpenDisplay(":0"); //pass NULL without "" to read from environment variable DISPLAY
+   	display = XOpenDisplay(DISPLAY);
    	if(display == NULL) {
 		fprintf(stderr,"Failed open display\n");
       		return false;
@@ -93,14 +101,6 @@ bool setup() {
 
 	//register sigterm handler
 	signal(SIGINT, sigterm_handler);
-	signal(SIGALRM, sigtimer_handler);
-	
-	struct itimerval timer;
-	timer.it_value.tv_sec = 0 ;
-   	timer.it_value.tv_usec = TIMER_INTERVAL;
-   	timer.it_interval.tv_sec = 0;
-   	timer.it_interval.tv_usec = TIMER_INTERVAL;
-	setitimer ( ITIMER_REAL, &timer, NULL ) ;
 
 	return true;
 }
@@ -111,69 +111,100 @@ void send_event (unsigned int keycode, bool pressed) {
 	XFlush(display);	
 }
 
+ 
+int8_t encode_read1(void)         // read single step encoders
+{
+  int8_t val= enc_delta;
+  enc_delta = 0; 
+  return val;                   // counts since last call
+}
 
+void do_cycle(void) {
 
-void do_poll() {
-	for(int i=0; i<number_of_pins; i++) { //once for each pin
-		pin_setting_t pin_setting = pin_configuration[i]; //get the current pin
-		bool current_state = (bcm2835_gpio_lev(pin_setting.pin)==HIGH);
-		bool old_state = pin_state[i];
-	
+	if(++key_read_time == KEY_READ_CYCLES) { //increment counter and compare
+		key_read_time=0;
 
-		if(!current_state) { //button is LOW
-			if(pin_pressed_time[i] == LONG_PRESS_CYCLES && pin_setting.keycode_long!=0 ) {
-				printf("send long press down\n");
-				send_event(pin_setting.keycode_long,true);
-			}
-
-			pin_pressed_time[i]++;
-		}
-
-		if(current_state != old_state && current_state) { //if butten released = positive edge detected
-			if(pin_pressed_time[i] > LONG_PRESS_CYCLES) {
-				if(pin_setting.keycode_long!=0) {
-					printf("send long press up\n");
-					send_event(pin_setting.keycode_long,false);
-				}
-			} else {
-				printf("send short press down\n");
-				send_event(pin_setting.keycode_short,true);
-				printf("send short press up\n");
-				send_event(pin_setting.keycode_short,false);
-			}
-			pin_pressed_time[i] = 0;
-		} 		
+		for(int i=0; i<number_of_pins; i++) { //once for each pin
+			pin_setting_t pin_setting = pin_configuration[i]; //get the current pin
+			bool current_state = (bcm2835_gpio_lev(pin_setting.pin)==HIGH);
+			bool old_state = pin_state[i];
 		
-		pin_state[i] = current_state;		
+
+			if(!current_state) { //button is LOW
+				if(pin_pressed_time[i] == LONG_PRESS_CYCLES && pin_setting.keycode_long!=0 ) {
+					#ifdef DEBUG
+						printf("send long press down\n");
+					#endif
+					send_event(pin_setting.keycode_long,true);
+				}
+
+				pin_pressed_time[i]++;
+			}
+
+			if(current_state != old_state && current_state) { //if butten released = positive edge detected
+				if(pin_pressed_time[i] > LONG_PRESS_CYCLES) {
+					if(pin_setting.keycode_long!=0) {
+					#ifdef DEBUG
+						printf("send long press up\n");
+					#endif
+						send_event(pin_setting.keycode_long,false);
+					}
+				} else {
+					#ifdef DEBUG
+						printf("send short press down\n");
+					#endif
+					send_event(pin_setting.keycode_short,true);
+					
+					#ifdef DEBUG
+						printf("send short press up\n");
+					#endif
+					send_event(pin_setting.keycode_short,false);
+				}
+				pin_pressed_time[i] = 0;
+			} 		
+			
+			pin_state[i] = current_state;		
+		}
 	}
 
-	//http://www.mikrocontroller.net/articles/Drehgeber#Solide_L.C3.B6sung:_Beispielcode_in_C
-	  int8_t new=0, diff;
- 
-	  if(bcm2835_gpio_lev(ROTARY_ENC_PIN_A)==HIGH)
-	    new = 3;
-	  if(bcm2835_gpio_lev(ROTARY_ENC_PIN_B)==HIGH)
-	    new ^= 1;                   // convert gray to binary
-	  diff = enc_last - new;                // difference last - new
-	  if( diff & 1 ){               // bit 0 = value (1)
-	    enc_last = new;                 // store new as next last
-	    enc_delta += (diff & 2) - 1;        // bit 1 = direction (+/-)
-	  }
+	if(++enc_read_time == ENC_READ_CYCLES) { //increment counter and compare
+		enc_read_time=0;
+		//http://www.mikrocontroller.net/articles/Drehgeber#Dekoder_f.C3.BCr_Drehgeber_mit_wackeligen_Rastpunkten
+		enc_last = (enc_last << 2)  & 0x0F;
+
+		if(bcm2835_gpio_lev(ROTARY_ENC_PIN_A)==HIGH)
+			enc_last |= 2;
+		if(bcm2835_gpio_lev(ROTARY_ENC_PIN_B)==HIGH)
+			enc_last |=1;
+		enc_delta += table[enc_last];
+	}
 		
 
+	if(++enc_send_time == ENC_SEND_CYCLES) { //increment counter and compare
+		enc_send_time=0;
+		int8_t delta = encode_read1();
+		
+		if(delta!=0) {
+			#ifdef DEBUG
+				printf("Rotary Encoder %d\n",delta);
+			#endif
+
+			int8_t amount = abs(delta);
+			unsigned int keycode = ROTARY_ENC_KEYCODE_RIGHT;
+
+			if(delta<0) {
+				keycode=ROTARY_ENC_KEYCODE_LEFT;
+			} 		
+			for(int i=0; i<amount; i++) {
+				send_event(keycode,true); //pressed event
+				send_event(keycode,false); //released event
+			}
+		} 
+	}
 
 }
 
- 
-int8_t encode_read1( void )         // read single step encoders
-{
-  int8_t val;
-  val = enc_delta;
-enc_delta = val & 3;; 
- //enc_delta = 0;
-  return val>>2;                   // counts since last call
-}
- 
+
 
 
 int main() {
@@ -185,12 +216,8 @@ int main() {
 	fprintf(stdout,"Setup ok\n");
 
 	while(!terminate) {
-	/*	do_poll();
 		bcm2835_delay(WAIT_CYCLE); // sleep for WAIT_CYCLE miliseconds*/
-		sleep(1); //wait for one second
-		int8_t delta = encode_read1();
-		if(delta!=0) 
-			printf("encoder %d\n",delta);
+		do_cycle();
 	}
 	
 	bcm2835_close();

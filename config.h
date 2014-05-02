@@ -1,11 +1,16 @@
 
+//#define DEBUG          //uncomment to disable debugging output
 
 //-----------------defines------------------------------
-#define TIMER_INTERVAL  15*1000   //in microseconds
-#define LONG_PRESS_TIME 1000 * 1000 //in microseconds
+#define WAIT_CYCLE  1   //in miliseconds (must be a common divisor of the following 3 defines)
+#define ENC_READ_TIME 1 //in miliseconds
+#define ENC_SEND_TIME 20 //in miliseconds
+#define KEY_READ_TIME 50 //in miliseconds
+ 
+#define LONG_PRESS_TIME 500 //in miliseconds
 
 
-#define DEBUG          //uncomment to disable debugging output
+#define DISPLAY  ":0"   //NULL = user environment variable DISPLAY. Otherwise pass a string for the display host:displaynumber e.g. :0
 
 
 #define ROTARY_ENC_PIN_A    RPI_V2_GPIO_P1_16
@@ -15,6 +20,12 @@
 #define ROTARY_ENC_KEYCODE_RIGHT XK_Down
 
 
+//----------------calculations------------------------
+
+#define KEY_READ_CYCLES ((KEY_READ_TIME)/(WAIT_CYCLE)) //how many cycles to wait to read the keys
+#define LONG_PRESS_CYCLES ((LONG_PRESS_TIME)/(WAIT_CYCLE)/(KEY_READ_CYCLES)) //how many times do we need to read the keys to define a longpress
+#define ENC_READ_CYCLES ((ENC_READ_TIME)/(WAIT_CYCLE)) //how many cycles to wait to read the encoder
+#define ENC_SEND_CYCLES ((ENC_SEND_TIME)/(WAIT_CYCLE)) //how many cycles to wait to send the encoder state
 
 //----------------structures --------------------------
 #include <stdbool.h>
@@ -29,7 +40,6 @@ typedef struct pin_setting_s {
 
 } pin_setting_t;
 
-#define LONG_PRESS_CYCLES ((LONG_PRESS_TIME)/(TIMER_INTERVAL)) //how many timer interrupts to wait for a longpress
 
 
 
@@ -66,16 +76,5 @@ const pin_setting_t pin_configuration[] = {
 };
 
 
-
-
-//--------- Helper Variables for Configuration ----------------
-
 #define NUM_PINS (sizeof(pin_configuration)/ sizeof(pin_setting_t))
-
-const uint8_t number_of_pins = NUM_PINS; //number of configured pins
-
-bool pin_state[NUM_PINS]; //storage to save last state of pin
-uint16_t pin_pressed_time [NUM_PINS];  //storage to save the number cycles the pin was presse
-
-
 
