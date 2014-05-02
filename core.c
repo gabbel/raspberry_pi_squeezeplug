@@ -14,18 +14,15 @@
 
 #include "config.h"
 
-extern pin_setting_t pin_configuration[];
-extern uint8_t number_of_pins;
-extern bool pin_state []; //array to store last state of pin
-extern uint16_t pin_pressed_time[];
-
-
 
 //x11 varibales
 Display*  display; //the one and only display to use
 
 //Other variables
 volatile bool terminate = false; //abort condition
+volatile int8_t enc_delta;          // -128 ... 127
+static int8_t enc_last;
+
 
 /*
 Used Resources:
@@ -68,6 +65,21 @@ bool setup() {
     		//  with a pullup
     		bcm2835_gpio_set_pud(pin_setting.pin, BCM2835_GPIO_PUD_UP);
 	}
+
+	//configure rotary encoder
+	bcm2835_gpio_fsel(ROTARY_ENC_PIN_A, BCM2835_GPIO_FSEL_INPT);
+    	bcm2835_gpio_set_pud(ROTARY_ENC_PIN_A, BCM2835_GPIO_PUD_UP);
+	bcm2835_gpio_fsel(ROTARY_ENC_PIN_B, BCM2835_GPIO_FSEL_INPT);
+    	bcm2835_gpio_set_pud(ROTARY_ENC_PIN_B, BCM2835_GPIO_PUD_UP);
+
+ 	int8_t new = 0;
+	if(bcm2835_gpio_lev(ROTARY_ENC_PIN_A)==HIGH)
+		new = 3;
+	if(bcm2835_gpio_lev(ROTARY_ENC_PIN_B)==HIGH)
+	    	new ^= 1;                   // convert gray to binary
+	  
+	enc_last = new;                   // power on state
+	enc_delta = 0;	
 
 
 	// Obtain the X11 display.
@@ -134,7 +146,34 @@ void do_poll() {
 		
 		pin_state[i] = current_state;		
 	}
+
+	//http://www.mikrocontroller.net/articles/Drehgeber#Solide_L.C3.B6sung:_Beispielcode_in_C
+	  int8_t new=0, diff;
+ 
+	  if(bcm2835_gpio_lev(ROTARY_ENC_PIN_A)==HIGH)
+	    new = 3;
+	  if(bcm2835_gpio_lev(ROTARY_ENC_PIN_B)==HIGH)
+	    new ^= 1;                   // convert gray to binary
+	  diff = enc_last - new;                // difference last - new
+	  if( diff & 1 ){               // bit 0 = value (1)
+	    enc_last = new;                 // store new as next last
+	    enc_delta += (diff & 2) - 1;        // bit 1 = direction (+/-)
+	  }
+		
+
+
 }
+
+ 
+int8_t encode_read1( void )         // read single step encoders
+{
+  int8_t val;
+  val = enc_delta;
+enc_delta = val & 3;; 
+ //enc_delta = 0;
+  return val>>2;                   // counts since last call
+}
+ 
 
 
 int main() {
@@ -149,6 +188,9 @@ int main() {
 	/*	do_poll();
 		bcm2835_delay(WAIT_CYCLE); // sleep for WAIT_CYCLE miliseconds*/
 		sleep(1); //wait for one second
+		int8_t delta = encode_read1();
+		if(delta!=0) 
+			printf("encoder %d\n",delta);
 	}
 	
 	bcm2835_close();
