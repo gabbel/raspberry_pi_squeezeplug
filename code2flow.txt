@@ -1,0 +1,123 @@
+// Usage: Paste code under "http://code2flow.com/"
+
+//------------------------------------------------
+Main Routine;
+	call setup routine;
+	if(!setup ok) {
+		Main Routine Ends;
+		return;
+	}
+
+	while(!CTRL+C received) { 
+		Wait Cycle;
+		call do_cycle routine;
+	}
+	
+	call takedown routine;
+Main Routine Ends;
+//------------------------------------------------
+Setup Routine;
+  if(!opening display ok) {
+	  Setup Routine Ends with Error;
+		return;
+	}
+
+	if (!bcm2835 initialiaztion ok) {  
+	  Setup Routine Ends with Error;
+		return;
+	}
+	 
+	while (! all pins configured){  
+	  get pin from config;
+		set last pin state to high;
+	  configure pin as input;
+	  activate internal pullup resistor on pin;
+	}
+	configure encoder pin a & b as input;
+	activate internal pullup resistor on pins;
+  initialize variables for rotary encoder;
+	configure CTRL+C listener;
+Setup Routine Ends Successfull;
+//------------------------------------------------
+Takedown Routine;
+  free bcm2835 resources;
+  free x11 display resources;
+Takedown Routine Ends;
+//------------------------------------------------
+do_cycle Routine;
+increment key_read_time counter;
+	if(key_read_time counter reached defined number of cycles) { 
+		reset key_read_time to 0;
+		call key_read routine;
+	}
+increment enc_read_time counter;
+	if(enc_read_time counter reached defined number of cycles) { 
+		reset enc_read_time to 0;
+		call enc_read routine;
+	}
+		increment enc_send_time counter;
+	if(enc_send_time counter reached defined number of cycles) {
+		reset enc_send_time to 0;
+		call enc_send routine;
+	}
+do_cycle Routine Ends;
+//------------------------------------------------
+enc_read Routine;
+  get current state of encoder pins a&b;
+  calculate delta with current state and last state of pins;
+  save delta;
+enc_read Routine Ends;
+//------------------------------------------------
+enc_send Routine;
+  get delta from enc_read routine;
+	
+	if(delta not 0) {
+    calculate the absolute value of delta and store into <amount>;
+    if(delta is positive) {
+      use right turn keycode define;
+    } else {
+      use left turn keycode define;
+    }
+    
+    while(!keycode already sent <amount> of times  ) {
+      send keycode down event;
+      send keycode up event;
+		}
+}
+enc_send Routine Ends;
+//------------------------------------------------
+key_read Routine;
+while(!executed once for every pin) {  
+ get pin from config;
+	get current state of pin;
+	get old state of pin;  
+
+//button (still) pressed
+		if(current state is low) { 
+		  if(pin_pressed_time counter equals amount for long press
+		  AND 
+		  pin has a long press keycode configured 
+		  ) {  
+	
+	        send long press keycode down event;
+			}
+      increment pin_pressed_time counter;
+		} else {
+
+   //positive edge detected, button released
+      if(old state is low) {
+        if(pin_pressed_time counter is greater than amount for long press) {  
+  				if(pin has a long press keycode configured ) {  
+  					send long press keycode up event;
+  				}
+  			} else {  
+  			  send short press keycode down event;
+  				send short press keycode up event;
+  			}
+  			reset pin_pressed_time to 0;
+  		}
+		}		
+		set old state of pin to current state; 
+	}
+key_read Routine Ends;
+//------------------------------------------------
