@@ -64,15 +64,18 @@ cp -r ./jivelite /home/pi/raspberry_pi_squeezeplug
 
 ### Copy files to autostart openbox window manager, jivelite and to remove Decorations from Openbox ###
 #Autostart all
-cp ./conf_openbox/autostart /home/pi/.config/openbox/
+mkdir /home/pi/.config
+mkdir /home/pi/.config/openbox
+cp ./conf_openbox/autostart /home/pi/.config/openbox/autostart
 #Remove Window decorations
-cp ./conf_openbox/rc.xml /home/pi/.config/openbox/
+cp ./conf_openbox/rc.xml /home/pi/.config/openbox/rc.xml
 
 ### Copy jivlite custom files (Add screen resolutions for "HDSkin")
-cp -r ./conf_jivelite /jivelite/share/jive/applets/HDSkin
+cp -r ./conf_jivelite ./jivelite/share/jive/applets/HDSkin
+# Copy jivelite
+cp -r ./jivelite /home/pi/raspberry_pi_squeezeplug
 
 ### Create new boot configuration with new screen resolution
 mv /boot/config.txt /boot/config.old.txt
 cp ./conf_system/config.txt /boot/config.txt
 ### Done ##
-
