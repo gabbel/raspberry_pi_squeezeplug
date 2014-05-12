@@ -1,0 +1,7 @@
+#create file: /home/pi/.config/openbox/autostart
+# Autostart for openbox
+xset s off
+xset -dpms
+sudo $HOME/raspberry_pi_squeezeplug/io_poller &
+sleep 80; sudo service squeezelite restart;
+sleep 2; $HOME/raspberry_pi_squeezeplug/jivelite/bin/jivelite &
