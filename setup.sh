@@ -71,5 +71,7 @@ cp ./conf_openbox/rc.xml /home/pi/.config/openbox/
 ### Copy jivlite custom files (Add screen resolutions for "HDSkin")
 cp -r ./conf_jivelite /jivelite/share/jive/applets/HDSkin
 
+### Create new boot configuration with new screen resolution
+cp ./conf_system/config.txt /boot/config.txt
 ### Done ##
 
