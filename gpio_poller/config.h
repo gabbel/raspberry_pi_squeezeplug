@@ -1,5 +1,5 @@
 
-//#define DEBUG          //uncomment to disable debugging output
+//#define DEBUG          //uncomment to enable debugging output
 
 //-----------------defines------------------------------
 // Timings
