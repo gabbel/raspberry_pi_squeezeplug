@@ -1,4 +1,7 @@
 #!/bin/sh
+# Version: v0.1
+# Date: 2014-05-13
+# By Gabriel Winkler
 #Setup all
 #This file helps to install dependencies and compile the sourcecode for serval programms Needed by my Squeezebox radio.
 #It will also copy files to serval locations to autostart programms.
