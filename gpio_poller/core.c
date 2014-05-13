@@ -1,3 +1,4 @@
+//Version: v1.0 Date: 2014-05-11 By: Gabriel Winkler
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -5,12 +6,15 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-
+// X11 Library
 #include <X11/Xlib.h>
+// Used to simulate keyboard inputs to X11
 #include <X11/keysym.h>
+// Needed, otherwise X11 ignores "Software" keyboards
 #include <X11/extensions/XTest.h>
+// BCM2835 SOC Library needed to use the GPIO of the Raspberry Pi
 #include <bcm2835.h>
-
+// The Configuration file, changing key bindings, timings and calculations
 #include "config.h"
 
 
